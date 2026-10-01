@@ -1,4 +1,6 @@
-node_modules
-.next
-out
-*.zip
+build/
+*.gba
+*.sav
+*.elf
+tools/font8x8_basic.h
+__pycache__/

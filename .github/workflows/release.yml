@@ -1,0 +1,51 @@
+name: Build and release ROM
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  rom:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install the ARM toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-none-eabi python3-pil
+
+      - name: Build the ROM
+        run: make
+
+      - name: Keep the ROM as a build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: road-to-valencia
+          path: road-to-valencia.gba
+
+      - name: Tag and release this version
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="v$(cat VERSION)"
+          if git rev-parse -q --verify "refs/tags/$VERSION" >/dev/null; then
+            echo "$VERSION is already released. Bump VERSION to cut a new release."
+            exit 0
+          fi
+          awk -v head="## [${VERSION#v}]" '$0 == head {f = 1; next} /^## / {f = 0} f' CHANGELOG.md > notes.md
+          cp road-to-valencia.gba "road-to-valencia-$VERSION.gba"
+          gh release create "$VERSION" "road-to-valencia-$VERSION.gba" \
+            --title "Road to Valencia $VERSION" \
+            --notes-file notes.md \
+            --target "$GITHUB_SHA"
